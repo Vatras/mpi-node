@@ -1,0 +1,26 @@
+{
+  "name": "mpi_node",
+  "version": "1.0.0",
+  "description": "MPI implementation in node.js",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://Vatras@bitbucket.org/pjesek/mpi_node.git"
+  },
+  "keywords": [
+    "\\"
+  ],
+  "author": "Tomasz Fabisiak (pjesek)",
+  "license": "ISC",
+  "homepage": "https://bitbucket.org/pjesek/mpi_node#readme",
+  "dependencies": {
+    "Q": "0.0.1",
+    "json-socket": "^0.2.0",
+    "portfinder": "^1.0.10",
+    "q": "^1.4.1",
+    "stdio": "^0.2.7"
+  }
+}
