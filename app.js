@@ -13,13 +13,13 @@ var ops = stdio.getopt({
     'initiatorPort': {key: 'a',args: 1,description: 'Id of process'}
 });
 portfinder.basePort=12110;
-var tid = ops['tid'];
+var tid = parseInt(ops['tid']);
 var numOfProcesses = ops['numOfProcesses'];
-var portsMap = {};
+var portsMap = [];
 var myPort;
 var socketMap=[];
+var initiatorServer;
 function connect(host,port){
-    JsonSocket = require('json-socket');
     var socket = new JsonSocket(new net.Socket()); //Decorate a standard net.Socket with JsonSocket
     socket.connect(port, host);
     return socket;
@@ -43,9 +43,12 @@ function getPorts(processesNumber){
 
 function createProcesses(){
     for(var i = 1; i<numOfProcesses; i++) {
-        var array = JSON.stringify(portsMap);
-        console.log(array);
-        var workerProcess = child_process.exec('node app.js'+'>tid_'+i+' -t '+i+' -a '+myPort,function(){
+        var debug='';
+        if(debugTid === i){
+            debug='--debug '
+        }
+        console.log(portsMap);
+        var workerProcess = child_process.exec('node '+debug+'app.js'+'>tid_'+i+' -t '+i+' -a '+myPort,function(){
 
         });
         console.log(i);
@@ -58,10 +61,9 @@ function init(cb){
     if(numOfProcesses){
         getPorts(numOfProcesses).then(function(data){
             console.log("portsArray= "+data);
-            portsMap.array=data;
+            portsMap=data;
             myPort=data[0];
-            createServer();
-            createProcesses();
+            createServer().then(createProcesses());
         });
     }
     else{
@@ -71,63 +73,104 @@ function init(cb){
         createSocketConnectionWithInitiator(initiatorPort,cb);
     }
 }
-function createSocketConnection(ports,serverSocket,cb){
-    var numberOfConnections=1;
-    socketMap = ports.map(function(port,index){
-        if(index==0){
-            return serverSocket;
-        }
-        var socket = connect('localhost',port);
-        socket.on('connect', function() { //Don't send until we're connected
-            numberOfConnections++;
-            if(numberOfConnections==numOfProcesses){
-                if(cb){
-                    cb();
-                }
-            }
-        });
-    })
 
-
-}
 
 function createSocketConnectionWithInitiator(initiatorPort,cb){
-    var socket = connect('localhost',initiatorPort);
-    socket.on('connect', function() { //Don't send until we're connected
+    var deferred = Q.defer();
+    initiatorServer = connect('localhost',initiatorPort);
+    function createSocketConnection(){
+        var numberOfConnections=1;
+        socketMap = portsMap.map(function(port,index){
+            if(index==0){
+                return initiatorServer;
+            }
+            var tempSocket = connect('localhost',port);
+            tempSocket.on('connect', function() {
+                numberOfConnections++;
+                if(numberOfConnections==numOfProcesses){
+                  deferred.resolve();
+                }
+            return tempSocket;
+            });
+        })
+        return deferred.promise;
+    }
+    initiatorServer.on('connect', function() { //Don't send until we're connected
         //socket.sendMessage({a: 5, b: 7});
-        socket.on('message', function(message) {
-            var array = JSON.stringify(message);
-            console.log('Client received'+array);
-
-            myPort = array[tid];
-            createServerForClients();
-            createSocketConnection(message.array,socket,cb);
+        initiatorServer.on('message', function(message) {
+            if(message.type === 'portsMap'){
+            portsMap = message.array;
+            console.log('Client received'+portsMap);
+            myPort = portsMap[tid];
+            createServerForClients()
+                .then(createSocketConnection)
+                .then(cb);
+            }
         });
     });
+
 }
 
 function createServer(){
+    var deferred = Q.defer();
     var server = net.createServer();
-    server.listen(myPort);
+    server.listen({port: myPort},function(){
+        deferred.resolve();
+    });
+
+    var creationsNumber=1;
     server.on('connection', function(socket) { //This is a standard net.Socket
         console.log("connection from client");
         socket = new JsonSocket(socket); //Now we've decorated the net.Socket to be a JsonSocket
-        socket.sendMessage(portsMap)
-        socket.on('message', function(message) {
-            console.log("server received: "+message);
+
+        socket.sendMessage({type: 'portsMap',array: portsMap})
+
+        socket.on('message', function(message,a,b) {
+            if(message.type === 'serverCreated'){
+                socketMap.push({tid:message.tid, socket: socket})
+                creationsNumber++;
+                if(creationsNumber == numOfProcesses){
+                    socketMap=socketMap.sort(function(a,b){
+                        return a.tid-b.tid
+                    })
+                    socketMap=socketMap.map(function(a,b){
+                        return a.socket;
+                    })
+                    broadcast({type:'allServersCreated'});
+                }
+            }
+            console.log("server received: "+JSON.stringify(message));
         });
     });
+    return deferred.promise;
+}
+function broadcast(message){
+    socketMap.forEach(function(socket){
+        socket.sendMessage(message);
+    })
 }
 function createServerForClients(){
+    var deferred = Q.defer();
     var server = net.createServer();
-    server.listen(myPort);
+    server.listen({port: myPort},function(){
+        initiatorServer.sendMessage({tid: tid,type: 'serverCreated'})
+        var startFunction = function(message){
+            if(message.type==='allServersCreated'){
+                console.log('received allServersCreated')
+                //initiatorServer.removeListener(startFunction);
+                deferred.resolve();
+            }
+        }
+        initiatorServer.on('message',startFunction)
+    });
     server.on('connection', function(socket) { //This is a standard net.Socket
         socket = new JsonSocket(socket);
-        console.log("connection from other clients");
         socket.on('message', function(message) {
             console.log("client received: "+message);
         });
-    });
+
+    })
+    return deferred.promise;
 }
 
 module.exports = {
@@ -136,9 +179,14 @@ module.exports = {
     numOfProcesses : numOfProcesses,
     portsMap : portsMap,
     myPort : myPort,
-    socketMap : socketMap
+    socketMap : socketMap,
+    eventEmitter : eventEmitter
 }
-
-init(function(){
+var debugTid=0;
+if(numOfProcesses){
+    init(function(){
     console.log("zainicjowano!")
 })
+}else{
+    setTimeout(init,7000);
+}
