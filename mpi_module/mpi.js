@@ -13,9 +13,9 @@ var ops = stdio.getopt({
     'initiatorPort': {key: 'a',args: 1,description: 'Id of process'}
 });
 portfinder.basePort=12110;
-var tid = parseInt(ops['tid']);
-var numOfProcesses = parseInt(ops['numOfProcesses']);
+var numOfProcesses = ops['numOfProcesses'] ? parseInt(ops['numOfProcesses']) : undefined;
 var isInitiator = ops['numOfProcesses'] ? true : false;
+var tid = isInitiator ? 0 : parseInt(ops['tid']);
 var portsMap = [];
 var myPort;
 var socketMap=[];
@@ -121,6 +121,8 @@ function createSocketConnectionWithInitiator(initiatorPort,cb){
 }
 
 function createServer(cb){
+    socketMap = new Array(1)
+    socketMap[0] = {tid:0}
     var deferred = Q.defer();
     var server = net.createServer();
     server.listen({port: myPort},function(){
@@ -158,6 +160,7 @@ function createServer(cb){
     return deferred.promise;
 }
 function broadcast(message){
+    console.log("broadcasting",JSON.stringify(message));
     socketMap.forEach(function(socket,index){
         if(index!=tid){
             socket.sendMessage(message);
@@ -165,6 +168,7 @@ function broadcast(message){
     })
 }
 function send(receiver,message){
+    console.log("sending to",receiver,JSON.stringify(message));
     socketMap[receiver].sendMessage(message);
 }
 
@@ -174,6 +178,8 @@ function createServerForClients(){
     server.listen({port: myPort},function(){
         initiatorServer.sendMessage({tid: tid,type: 'serverCreated'})
         var startFunction = function(message){
+            console.log('initiator sent:',JSON.stringify(message));
+            eventEmitter.emit(message.type,message);
             if(message.type==='allServersCreated'){
                 console.log('received allServersCreated')
                 //initiatorServer.removeListener(startFunction);
@@ -196,13 +202,15 @@ function createServerForClients(){
 }
 
 
-
+function getNumOfProcesses(){
+    return numOfProcesses
+}
 module.exports = {
     init: init,
     broadcast:broadcast,
     send : send,
     tid : tid,
-    numOfProcesses : numOfProcesses,
+    numOfProcesses : getNumOfProcesses,
     portsMap : portsMap,
     myPort : myPort,
     socketMap : socketMap,
