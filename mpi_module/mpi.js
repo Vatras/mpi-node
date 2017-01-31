@@ -8,13 +8,15 @@ var events = require('events');
 var eventEmitter = new events.EventEmitter();
 var JsonSocket = require('json-socket')
 var ops = stdio.getopt({
-    'numOfProcesses': {key: 'n',args: 1, description: 'Another description'},
+    'processToCreate': {key: 'n',args: 1, description: 'Number of processes given to initiator to create (including itself)'},
+    'numOfProcesses': {key: 'p',args: 1, description: 'Number of processes to differ initiator from child processes'},
     'tid': {key: 't',args: 1,description: 'Id of process'},
     'initiatorPort': {key: 'a',args: 1,description: 'Id of process'}
 });
+var fs = require('fs');
 portfinder.basePort=12110;
-var numOfProcesses = ops['numOfProcesses'] ? parseInt(ops['numOfProcesses']) : undefined;
-var isInitiator = ops['numOfProcesses'] ? true : false;
+var numOfProcesses = ops['processToCreate'] ? parseInt(ops['processToCreate']) : parseInt(ops['numOfProcesses']);
+var isInitiator = ops['processToCreate'] ? true : false;
 var tid = isInitiator ? 0 : parseInt(ops['tid']);
 var portsMap = [];
 var myPort;
@@ -22,6 +24,15 @@ var socketMap=[];
 var initiatorServer;
 var server;
 var debugTid;
+function writePortsToFile(ports){
+    fs.writeFile("public/ports.json", JSON.stringify(ports), function(err) {
+    if(err) {
+        return console.log(err);
+    }
+    console.log("The file was saved!");
+    }); 
+    
+}
 function connect(host,port){
     var socket = new JsonSocket(new net.Socket()); //Decorate a standard net.Socket with JsonSocket
     socket.connect(port, host);
@@ -51,7 +62,7 @@ function createProcesses(){
             debug='--debug '
         }
         console.log(portsMap);
-        child_process.exec('node '+debug+'app.js'+'>tid_'+i+' -t '+i+' -a '+myPort);
+        child_process.exec('node '+debug+'app.js'+'>tid_'+i+' -t '+i+' -a '+myPort+' -p '+numOfProcesses);
         console.log(i);
     }
 
@@ -63,6 +74,8 @@ function init(cb,tidToDebug){
         getPorts(numOfProcesses).then(function(data){
             console.log("portsArray= "+data);
             portsMap=data;
+            console.log("writing",portsMap)
+            writePortsToFile(portsMap)
             myPort=data[0];
             createServer(cb).then(createProcesses());
         });
@@ -82,33 +95,27 @@ function createSocketConnectionWithInitiator(initiatorPort,cb){
     function createSocketConnection(){
         var numberOfConnections=1;
         socketMap =  new Array(numOfProcesses);
-         portsMap.map(function(port,index){
+         portsMap.forEach(function(port,index){
             if(index==0){
                 socketMap[index] = initiatorServer;
                 return;
             }
-            else if(index === tid){
-
-            }
             var tempSocket = connect('localhost',port);
             tempSocket.on('connect', function() {
                 socketMap[index] = tempSocket;
-                // tempSocket.sendMessage({type: 'hellos', content:"bfdsfsd"})
+                tempSocket.sendMessage({type: 'initial', content:tid})
                 numberOfConnections++;
                 if(numberOfConnections==numOfProcesses){
                   deferred.resolve();
                 }
-            return tempSocket;
             });
         })
         return deferred.promise;
     }
     initiatorServer.on('connect', function() { //Don't send until we're connected
-        //socket.sendMessage({a: 5, b: 7});
         initiatorServer.on('message', function(message) {
             if(message.type === 'portsMap'){
             portsMap = message.array;
-            numOfProcesses = portsMap.length;
             console.log('Client received'+portsMap);
             myPort = portsMap[tid];
             createServerForClients()
@@ -138,23 +145,25 @@ function createServer(cb){
 
         socket.on('message', function(message,a,b) {
             if(message.type === 'serverCreated'){
+                console.log("server received: "+JSON.stringify(message));
+                socket.processTid = message.tid
                 socketMap.push({tid:message.tid, socket: socket})
                 creationsNumber++;
-                if(creationsNumber == numOfProcesses){
+                if(creationsNumber === numOfProcesses){
                     socketMap=socketMap.sort(function(a,b){
                         return a.tid-b.tid
                     })
-                    socketMap=socketMap.map(function(a,b){
-                        return a.socket;
+                    socketMap=socketMap.map(function(item,index){
+                        return item.socket;
                     })
                     broadcast({type:'allServersCreated'});
                     cb();
                 }
             }
             else{
+                message.processTid = socket.processTid;
                 eventEmitter.emit(message.type,message);
             }
-            console.log("server received: "+JSON.stringify(message));
         });
     });
     return deferred.promise;
@@ -177,42 +186,54 @@ function createServerForClients(){
     server = net.createServer();
     server.listen({port: myPort},function(){
         initiatorServer.sendMessage({tid: tid,type: 'serverCreated'})
-        var startFunction = function(message){
+        initiatorServer.on('message',function(message){
             console.log('initiator sent:',JSON.stringify(message));
+            message.processTid=0;
             eventEmitter.emit(message.type,message);
             if(message.type==='allServersCreated'){
                 console.log('received allServersCreated')
                 //initiatorServer.removeListener(startFunction);
                 deferred.resolve();
             }
-        }
-        initiatorServer.on('message',startFunction)
+        })
 
         server.on('connection', function(socket) { //This is a standard net.Socket
             console.log('connection from other client')
             socket = new JsonSocket(socket);
             socket.on('message', function(message) {
+                if(message.type === 'initial'){
+                    socket.processTid = message.content
+                }
                 console.log("client received on his socket: ",JSON.stringify(message));
+                message.processTid = socket.processTid;
                 eventEmitter.emit(message.type,message);
             });
-
         })
     });
     return deferred.promise;
 }
 
-
-function getNumOfProcesses(){
-    return numOfProcesses
+function eventEmitterOn(event,cb){
+    if(typeof event === 'string')
+    {
+        eventEmitter.on(event,cb)
+    }else{
+        eventEmitter.on(event.type,function(message){
+            if(message.processTid === event.from){
+                cb(message)
+            }
+        })
+    }
+}
+function getPort(){
+    return myPort
 }
 module.exports = {
     init: init,
     broadcast:broadcast,
     send : send,
-    tid : tid,
-    numOfProcesses : getNumOfProcesses,
-    portsMap : portsMap,
-    myPort : myPort,
-    socketMap : socketMap,
-    eventEmitter : eventEmitter
+    recv : eventEmitterOn,
+    rank : tid,
+    myPort : getPort,
+    size : numOfProcesses
 }

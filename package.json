@@ -18,9 +18,11 @@
   "homepage": "https://bitbucket.org/pjesek/mpi_node#readme",
   "dependencies": {
     "Q": "0.0.1",
+    "express": "^4.14.0",
     "json-socket": "^0.2.0",
     "portfinder": "^1.0.10",
     "q": "^1.4.1",
+    "socket.io": "^1.7.2",
     "stdio": "^0.2.7"
   }
 }
