@@ -1,6 +1,6 @@
 {
   "name": "mpi-node",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "MPI implementation in node.js",
   "main": "mpi.js",
   "scripts": {
