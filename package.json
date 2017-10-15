@@ -15,13 +15,12 @@
   ],
   "author": "Tomasz Fabisiak (vatras/pjesek)",
   "license": "ISC",
-  "homepage": "https://bitbucket.org/pjesek/mpi_node#readme",
+  "homepage": "https://www.npmjs.com/package/mpi-node",
   "dependencies": {
-    "Q": "0.0.1",
-    "ip": "^1.1.5",
-    "json-socket": "^0.2.0",
-    "portfinder": "^1.0.10",
-    "q": "^1.4.1",
-    "stdio": "^0.2.7"
+    "ip": "1.1.5",
+    "json-socket": "0.2.1",
+    "portfinder": "1.0.13",
+    "q": "1.5.0",
+    "stdio": "0.2.7"
   }
 }
