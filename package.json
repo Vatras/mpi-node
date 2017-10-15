@@ -8,12 +8,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://Vatras@bitbucket.org/pjesek/mpi_node.git"
+    "url": "git+https://github.com/Vatras/mpi-node.git"
   },
   "keywords": [
     "\\"
   ],
-  "author": "Tomasz Fabisiak (pjesek)",
+  "author": "Tomasz Fabisiak (vatras/pjesek)",
   "license": "ISC",
   "homepage": "https://bitbucket.org/pjesek/mpi_node#readme",
   "dependencies": {
