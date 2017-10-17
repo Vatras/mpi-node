@@ -255,6 +255,9 @@ function getPort(){
 function getGlobalTid(){
     return globalTid
 }
+function getSize(){
+    return numOfProcesses;
+}
 module.exports = {
     init: init,
     broadcast:broadcast,
@@ -262,5 +265,5 @@ module.exports = {
     recv : eventEmitterOn,
     rank : getGlobalTid,
     myPort : getPort,
-    size : numOfProcesses
+    size : getSize
 }

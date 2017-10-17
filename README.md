@@ -85,7 +85,7 @@ function main(){
         }
         MPI.recv('Yes',function(message){
             numOfAnswers++;
-            if(numOfAnswers==MPI.size-1){
+            if(numOfAnswers==MPI.size()-1){
                 numOfAnswers=0;
                 clearTimeout(timeout);
                 MPI.broadcast({type: 'preCommit', content: 'transaction'})
@@ -102,7 +102,7 @@ function main(){
         })
         MPI.recv('ACK',function(message){
             numOfAnswers++;
-            if(numOfAnswers==MPI.size-1){
+            if(numOfAnswers==MPI.size()-1){
                 numOfAnswers=0;
                 clearTimeout(timeout);
                 MPI.broadcast({type: 'doCommit', content: 'transaction'})
