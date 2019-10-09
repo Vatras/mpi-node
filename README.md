@@ -15,7 +15,7 @@ MPI.size()
 //returns the size of the cluster (the number of nodes)
 ```
 ```js
-MPI.recv(msgType,callback)
+MPI.recv(msgType, callback)
 function callback(data){
 }
 //starts to listen on all messages with msgType type and invokes callback on each message with the content as first parameter
@@ -64,79 +64,79 @@ Available for node.js version 4.x or upper.
 
 Basic example of 3 phase commit algorithm using mpi-node library:
 ```js
-var MPI = require('mpi-node');
+const MPI = require('mpi-node');
 MPI.init(main);
-function main(){
-    var state='Begin'
-    var tid = MPI.rank()
-    var timeoutTime=5000;
-    var timeout;
-    var numOfAnswers=0;
-    if(tid == 0){
+function main () {
+    const tid = MPI.rank();
+    const timeoutTime = 5000;
+    let state = 'Begin';
+    let numOfAnswers = 0;
+    let timeout;
+    if (tid === 0) {
         sendCommitRequest();
-        setInterval(sendCommitRequest,1000);
-        function sendCommitRequest(){
-            MPI.broadcast({type: 'CanCommit', content: 'transaction'})
-            state = 'Waiting'
-            timeout = setTimeout(function(){
-                MPI.broadcast({type: 'Abort', content: 'transaction'})
-                state = 'Aborted'
-            },timeoutTime)
+        setInterval(sendCommitRequest, 1000);
+        function sendCommitRequest () {
+            MPI.broadcast({type: 'CanCommit', content: 'transaction'});
+            state = 'Waiting';
+            timeout = setTimeout(() => {
+                MPI.broadcast({type: 'Abort', content: 'transaction'});
+                state = 'Aborted';
+            }, timeoutTime);
         }
-        MPI.recv('Yes',function(message){
+        MPI.recv('Yes', (message) => {
             numOfAnswers++;
-            if(numOfAnswers==MPI.size()-1){
-                numOfAnswers=0;
+            if(numOfAnswers === MPI.size() - 1){
+                numOfAnswers = 0;
                 clearTimeout(timeout);
-                MPI.broadcast({type: 'preCommit', content: 'transaction'})
-                state = 'Prepared'
-                timeout = setTimeout(function(){
-                    MPI.broadcast({type: 'Abort', content: 'transaction'})
-                    state = 'Aborted'
-                },timeoutTime)
+                MPI.broadcast({type: 'preCommit', content: 'transaction'});
+                state = 'Prepared';
+                timeout = setTimeout(() => {
+                    MPI.broadcast({type: 'Abort', content: 'transaction'});
+                    state = 'Aborted';
+                }, timeoutTime);
             }
         })
-        MPI.recv('No',function(message){
-            MPI.broadcast({type: 'Abort', content: 'transaction'})
-            state = 'Aborted'
+        MPI.recv('No', (message) => {
+            MPI.broadcast({type: 'Abort', content: 'transaction'});
+            state = 'Aborted';
         })
-        MPI.recv('ACK',function(message){
+        MPI.recv('ACK', (message) => {
             numOfAnswers++;
-            if(numOfAnswers==MPI.size()-1){
-                numOfAnswers=0;
+            if(numOfAnswers === MPI.size() - 1){
+                numOfAnswers = 0;
                 clearTimeout(timeout);
-                MPI.broadcast({type: 'doCommit', content: 'transaction'})
-                state = 'Commited'
+                MPI.broadcast({type: 'doCommit', content: 'transaction'});
+                state = 'Commited';
             }
         });
     }
-    else{
-        MPI.recv('CanCommit',function(message){
-            timeout = setTimeout(abortHandler,timeoutTime);
-            MPI.send(0,{type: 'Yes', content: 'transaction'})
+    else {
+        MPI.recv('CanCommit', (message) => {
+            timeout = setTimeout(abortHandler, timeoutTime);
+            MPI.send(0, {type: 'Yes', content: 'transaction'});
             state = 'Waiting';
         })
-        MPI.recv('abort',abortHandler);
-        MPI.recv('preCommit',function(message){
+        MPI.recv('abort', abortHandler);
+        MPI.recv('preCommit', (message) => {
             clearTimeout(timeout);
-            timeout = setTimeout(commitHandler,timeoutTime);
-            MPI.send(0,{type: 'ACK', content: 'transaction'})
-            state = 'Prepared'
+            timeout = setTimeout(commitHandler, timeoutTime);
+            MPI.send(0, {type: 'ACK', content: 'transaction'});
+            state = 'Prepared';
         })
-        MPI.recv('doCommit',commitHandler)
+        MPI.recv('doCommit', commitHandler);
     }
-    function commitHandler(){
-        if(timeout){
+    function commitHandler () {
+        if (timeout) {
             clearTimeout(timeout);
         }
-        state='Commited';
+        state = 'Commited';
     }
     function abortHandler(message){
-        if(timeout){
+        if (timeout) {
             clearTimeout(timeout);
-            timeout=null;
+            timeout = null;
         }
-        state='aborted';
+        state = 'Aborted';
     }
 ```
 
