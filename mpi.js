@@ -188,16 +188,22 @@ function createServer(cb){
     return deferred.promise;
 }
 function broadcast(message){
-    console.log("broadcasting",JSON.stringify(message));
-    socketMap.forEach(function(socket,index){
-        if(index!=globalTid){
-            socket.sendMessage(message);
-        }
-    })
+  console.log("broadcasting", JSON.stringify(message));
+  socketMap.forEach(function (socket, index) {
+    if (index != globalTid) {
+      socket.sendMessage(message);
+    } else {
+      eventEmitter.emit(message.type, message);
+    }
+  });
 }
 function send(receiver,message){
-    console.log("sending to",receiver,JSON.stringify(message));
+  console.log("sending to", receiver, JSON.stringify(message));
+  if (receiver != globalTid) {
     socketMap[receiver].sendMessage(message);
+  } else {
+    eventEmitter.emit(message.type, message);
+  }
 }
 
 function createServerForClients(){
